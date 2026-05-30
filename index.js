@@ -2,6 +2,18 @@ const express = require('express');
 const app = express();
 app.use(express.urlencoded({ extended: false }));
 
+// Keep-alive ping to prevent Render free tier from sleeping
+const https = require('https');
+setInterval(() => {
+  https.get('https://cdjr-assistant.onrender.com/ping', (res) => {
+    console.log('Ping status:', res.statusCode);
+  }).on('error', (e) => {
+    console.log('Ping error:', e.message);
+  });
+}, 840000); // every 14 minutes
+
+app.get('/ping', (req, res) => res.send('ok'));
+
 app.post('/voice', (req, res) => {
   res.type('text/xml');
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
@@ -20,28 +32,28 @@ app.post('/menu', (req, res) => {
   if (digit === '1') {
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">You selected product cancellations. To cancel a warranty, G A P, or other product, we need your full name, phone number or email, and reason for cancelling such as sold the vehicle, total loss, or general cancellation. If there is a lien on the vehicle, proceeds go to the lender unless you provide proof of payoff. Cancellations take 6 to 8 weeks after paperwork is received. Please leave your information after the tone.</Say>
+  <Say voice="Polly.Joanna">You selected product cancellations. To cancel a warranty, G A P, or other product, we need your full name, phone number or email, and reason for cancelling such as sold the vehicle, total loss, or general cancellation. If there is a lien on the vehicle, proceeds go to the lender unless you provide proof of payoff. Cancellations take 6 to 8 weeks after paperwork is received. Please leave your information after the tone. Press pound when finished.</Say>
   <Record action="/message-received" method="POST" maxLength="120" finishOnKey="#" transcribe="true" transcribeCallback="/transcription"/>
   <Say voice="Polly.Joanna">We did not receive a recording. Goodbye.</Say>
 </Response>`);
   } else if (digit === '2') {
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">You selected registration, tags, or title. We handle most local registrations and issue metal plates in house. Out of state registrations take approximately two months. Please leave your information after the tone.</Say>
+  <Say voice="Polly.Joanna">You selected registration, tags, or title. We handle most local registrations and issue metal plates in house. Out of state registrations take approximately two months. Please leave your information after the tone. Press pound when finished.</Say>
   <Record action="/message-received" method="POST" maxLength="120" finishOnKey="#" transcribe="true" transcribeCallback="/transcription"/>
   <Say voice="Polly.Joanna">We did not receive a recording. Goodbye.</Say>
 </Response>`);
   } else if (digit === '3') {
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">You selected paperwork copies. Please leave your name, phone number, and the documents you need after the tone.</Say>
+  <Say voice="Polly.Joanna">You selected paperwork copies. Please leave your name, phone number, and the documents you need after the tone. Press pound when finished.</Say>
   <Record action="/message-received" method="POST" maxLength="120" finishOnKey="#" transcribe="true" transcribeCallback="/transcription"/>
   <Say voice="Polly.Joanna">We did not receive a recording. Goodbye.</Say>
 </Response>`);
   } else if (digit === '4') {
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">You selected general finance questions. Please leave your name and phone number after the tone and a finance specialist will return your call.</Say>
+  <Say voice="Polly.Joanna">You selected general finance questions. Please leave your name and phone number after the tone and a finance specialist will return your call. Press pound when finished.</Say>
   <Record action="/message-received" method="POST" maxLength="120" finishOnKey="#" transcribe="true" transcribeCallback="/transcription"/>
   <Say voice="Polly.Joanna">We did not receive a recording. Goodbye.</Say>
 </Response>`);
@@ -54,7 +66,7 @@ app.post('/menu', (req, res) => {
   } else {
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">Please leave your message after the tone.</Say>
+  <Say voice="Polly.Joanna">Please leave your message after the tone. Press pound when finished.</Say>
   <Record action="/message-received" method="POST" maxLength="120" finishOnKey="#" transcribe="true" transcribeCallback="/transcription"/>
   <Say voice="Polly.Joanna">We did not receive a recording. Goodbye.</Say>
 </Response>`);
@@ -80,5 +92,5 @@ app.post('/transcription', (req, res) => {
   res.sendStatus(200);
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`CDJR Assistant running on port ${PORT}`));
