@@ -3,30 +3,34 @@ const https = require('https');
 const app = express();
 app.use(express.urlencoded({ extended: false }));
 
-// Send email via SendGrid HTTP API
-function sendEmail(subject, body) {
-  const data = JSON.stringify({
-    personalizations: [{ to: [{ email: 'homer.araoz@capecoralcdjr.com' }] }],
-    from: { email: 'araozhomer@gmail.com', name: 'Cape Coral CDJR Finance' },
-    subject: subject,
-    content: [{ type: 'text/plain', value: body }]
-  });
+// Send SMS via Twilio API
+function sendSMS(message) {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const from = '+12397666445'; // Your Twilio number
+  const to = '+19545545411';   // Your cell phone
+
+  const data = new URLSearchParams({
+    From: from,
+    To: to,
+    Body: message
+  }).toString();
 
   const options = {
-    hostname: 'api.sendgrid.com',
-    path: '/v3/mail/send',
+    hostname: 'api.twilio.com',
+    path: `/2010-04-01/Accounts/${accountSid}/Messages.json`,
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${process.env.SENDGRID_API_KEY}`,
-      'Content-Type': 'application/json',
+      'Authorization': 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64'),
+      'Content-Type': 'application/x-www-form-urlencoded',
       'Content-Length': Buffer.byteLength(data)
     }
   };
 
   const req = https.request(options, (res) => {
-    console.log('Email status:', res.statusCode);
+    console.log('SMS status:', res.statusCode);
   });
-  req.on('error', (e) => console.error('Email error:', e.message));
+  req.on('error', (e) => console.error('SMS error:', e.message));
   req.write(data);
   req.end();
 }
@@ -100,15 +104,11 @@ app.post('/menu', (req, res) => {
 app.post('/message-received', (req, res) => {
   const category = req.query.category || 'General';
   const caller = req.body.From || 'Unknown';
-  const recording = req.body.RecordingUrl || 'none';
   const time = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
 
   console.log(`VOICEMAIL [${category}] from ${caller}`);
 
-  sendEmail(
-    `New Voicemail - ${category} - ${caller}`,
-    `New voicemail at Cape Coral CDJR Finance\n\nCategory: ${category}\nCaller: ${caller}\nTime: ${time}\nRecording: ${recording}\n\nTranscription coming shortly.\n\nPlease return call next business day.`
-  );
+  sendSMS(`📞 CDJR Finance Voicemail\nCategory: ${category}\nCaller: ${caller}\nTime: ${time}\nTranscription coming shortly...`);
 
   res.type('text/xml');
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
@@ -122,14 +122,10 @@ app.post('/transcription', (req, res) => {
   const category = req.query.category || 'General';
   const caller = req.body.From || 'Unknown';
   const text = req.body.TranscriptionText || 'Not available';
-  const time = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
 
   console.log(`TRANSCRIPTION [${category}] from ${caller}: ${text}`);
 
-  sendEmail(
-    `Transcription - ${category} - ${caller}`,
-    `Voicemail Transcription - Cape Coral CDJR Finance\n\nCategory: ${category}\nCaller: ${caller}\nTime: ${time}\n\nMessage:\n"${text}"\n\nPlease return call next business day.`
-  );
+  sendSMS(`📝 CDJR Transcription\nCategory: ${category}\nCaller: ${caller}\nMessage: "${text}"`);
 
   res.sendStatus(200);
 });
