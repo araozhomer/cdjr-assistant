@@ -1,38 +1,37 @@
 const express = require('express');
+const https = require('https');
 const app = express();
 app.use(express.urlencoded({ extended: false }));
 
-// Email via fetch to Gmail API alternative - using simple SMTP
-async function sendEmail(subject, body) {
-  try {
-    const nodemailer = require('nodemailer');
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      },
-      tls: {
-        rejectUnauthorized: false
-      }
-    });
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: 'homer.araoz@capecoralcdjr.com',
-      subject: subject,
-      text: body
-    });
-    console.log('Email sent OK');
-  } catch (err) {
-    console.error('Email failed:', err.message);
-    // Don't crash the app - just log the error
-  }
+// Send email via SendGrid HTTP API
+function sendEmail(subject, body) {
+  const data = JSON.stringify({
+    personalizations: [{ to: [{ email: 'homer.araoz@capecoralcdjr.com' }] }],
+    from: { email: 'araozhomer@gmail.com', name: 'Cape Coral CDJR Finance' },
+    subject: subject,
+    content: [{ type: 'text/plain', value: body }]
+  });
+
+  const options = {
+    hostname: 'api.sendgrid.com',
+    path: '/v3/mail/send',
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.SENDGRID_API_KEY}`,
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(data)
+    }
+  };
+
+  const req = https.request(options, (res) => {
+    console.log('Email status:', res.statusCode);
+  });
+  req.on('error', (e) => console.error('Email error:', e.message));
+  req.write(data);
+  req.end();
 }
 
 // Keep-alive ping
-const https = require('https');
 setInterval(() => {
   https.get('https://cdjr-assistant.onrender.com/ping', () => {}).on('error', () => {});
 }, 840000);
@@ -53,12 +52,6 @@ app.post('/voice', (req, res) => {
 app.post('/menu', (req, res) => {
   const digit = req.body.Digits;
   res.type('text/xml');
-
-  const record = (cat) => `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Record action="/message-received?category=${cat}" method="POST" maxLength="120" finishOnKey="#" transcribe="true" transcribeCallback="/transcription?category=${cat}"/>
-  <Say voice="Polly.Joanna">We did not receive a recording. Goodbye.</Say>
-</Response>`;
 
   if (digit === '1') {
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
@@ -112,7 +105,6 @@ app.post('/message-received', (req, res) => {
 
   console.log(`VOICEMAIL [${category}] from ${caller}`);
 
-  // Send email async - don't await so it doesn't block response
   sendEmail(
     `New Voicemail - ${category} - ${caller}`,
     `New voicemail at Cape Coral CDJR Finance\n\nCategory: ${category}\nCaller: ${caller}\nTime: ${time}\nRecording: ${recording}\n\nTranscription coming shortly.\n\nPlease return call next business day.`
